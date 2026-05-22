@@ -14,6 +14,19 @@
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
+  * * HARDWARE WIRING INSTRUCTIONS:
+  * * Connect Waveshare BMP390 (I2C) to the STM32 board using the following pinout:
+  *
+  * Sensor Pin   |   STM32 Pin         |  Wire Color
+  * -------------|---------------------|-----------------------
+  * VCC          |   3V3 (CN8)         |  Purple
+  * GND          |   GND (CN8)         |  Orange
+  * SDA          |   PB9 (D14) (I2C1)  |  Blue
+  * SCL          |   PB8 (D15) (I2C1)  |  Yellow
+  *
+  * I2C Address: 0x77 (ADDR jumper bridged -> 0x76)
+  *
+  ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -21,6 +34,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -31,6 +46,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define BMP390_I2C_ADDRESS  (0x77 << 1)  // Configures the address to 0xEE for HAL
 
 /* USER CODE END PD */
 
@@ -69,44 +86,69 @@ static void MX_USART3_UART_Init(void);
   */
 int main(void)
 {
+	/* USER CODE BEGIN 1 */
 
-  /* USER CODE BEGIN 1 */
+	/* USER CODE END 1 */
 
-  /* USER CODE END 1 */
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* MCU Configuration--------------------------------------------------------*/
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE END Init */
 
-  /* USER CODE END Init */
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* USER CODE BEGIN SysInit */
 
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE END SysInit */
 
-  /* USER CODE END SysInit */
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_I2C1_Init();
+	MX_USART3_UART_Init();
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_USART3_UART_Init();
-  /* USER CODE BEGIN 2 */
+	/* USER CODE BEGIN 2 */
+	uint8_t chip_id_reg = 0x00;
+	uint8_t chip_id_val = 0;
+	char uart_buf[50];
+	int len;
 
-  /* USER CODE END 2 */
+	// 1. Check if the device responds on the bus using your definition
+	if (HAL_I2C_IsDeviceReady(&hi2c1, BMP390_I2C_ADDRESS, 3, 100) == HAL_OK)
+	{
+		HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 detected!\r\n", 18, 100);
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
+		// 2. Read the Chip ID Register (0x00) using your definition
+		if (HAL_I2C_Mem_Read(&hi2c1, BMP390_I2C_ADDRESS, chip_id_reg, I2C_MEMADD_SIZE_8BIT, &chip_id_val, 1, 100) == HAL_OK)
+		{
+			len = snprintf(uart_buf, sizeof(uart_buf), "Chip ID: 0x%02X (Expected: 0x60)\r\n", chip_id_val);
+			HAL_UART_Transmit(&huart3, (uint8_t*)uart_buf, len, 100);
+		}
+		else
+		{
+			HAL_UART_Transmit(&huart3, (uint8_t*)"Failed to read Chip ID.\r\n", 24, 100);
+		}
+	}
+	else
+	{
+		HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 NOT detected. Check wiring/pullups.\r\n", 44, 100);
+	}
 
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+	/* USER CODE END 2 */
+
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+	while (1)
+	{
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
+	}
+	/* USER CODE END 3 */
 }
 
 /**
