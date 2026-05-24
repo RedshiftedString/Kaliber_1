@@ -36,6 +36,7 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdio.h>
+#include "bmp390.h"
 
 /* USER CODE END Includes */
 
@@ -63,7 +64,8 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-
+BMP390_t bmp_sensor;
+volatile bool bmp390_data_ready = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,69 +88,68 @@ static void MX_USART3_UART_Init(void);
   */
 int main(void)
 {
-	/* USER CODE BEGIN 1 */
 
-	/* USER CODE END 1 */
+  /* USER CODE BEGIN 1 */
 
-	/* MCU Configuration--------------------------------------------------------*/
+  /* USER CODE END 1 */
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+  /* MCU Configuration--------------------------------------------------------*/
 
-	/* USER CODE BEGIN Init */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-	/* USER CODE END Init */
+  /* USER CODE BEGIN Init */
 
-	/* Configure the system clock */
-	SystemClock_Config();
+  /* USER CODE END Init */
 
-	/* USER CODE BEGIN SysInit */
+  /* Configure the system clock */
+  SystemClock_Config();
 
-	/* USER CODE END SysInit */
+  /* USER CODE BEGIN SysInit */
 
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
-	MX_I2C1_Init();
-	MX_USART3_UART_Init();
+  /* USER CODE END SysInit */
 
-	/* USER CODE BEGIN 2 */
-	uint8_t chip_id_reg = 0x00;
-	uint8_t chip_id_val = 0;
-	char uart_buf[50];
-	int len;
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_USART3_UART_Init();
+  /* USER CODE BEGIN 2 */
 
-	// 1. Check if the device responds on the bus using your definition
-	if (HAL_I2C_IsDeviceReady(&hi2c1, BMP390_I2C_ADDRESS, 3, 100) == HAL_OK)
-	{
-		HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 detected!\r\n", 18, 100);
+  if (BMP390_Init(&bmp_sensor, &hi2c1))
+  {
+	  HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 Initialised successfully!\r\n", 34, 100);
+  }
+  else
+  {
+	  HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 Init failed!\r\n", 21, 100);
+  }
 
-		// 2. Read the Chip ID Register (0x00) using your definition
-		if (HAL_I2C_Mem_Read(&hi2c1, BMP390_I2C_ADDRESS, chip_id_reg, I2C_MEMADD_SIZE_8BIT, &chip_id_val, 1, 100) == HAL_OK)
-		{
-			len = snprintf(uart_buf, sizeof(uart_buf), "Chip ID: 0x%02X (Expected: 0x60)\r\n", chip_id_val);
-			HAL_UART_Transmit(&huart3, (uint8_t*)uart_buf, len, 100);
-		}
-		else
-		{
-			HAL_UART_Transmit(&huart3, (uint8_t*)"Failed to read Chip ID.\r\n", 24, 100);
-		}
-	}
-	else
-	{
-		HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 NOT detected. Check wiring/pullups.\r\n", 44, 100);
-	}
+  /* USER CODE END 2 */
 
-	/* USER CODE END 2 */
-
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
+		if (bmp390_data_ready)
+		{
+			bmp390_data_ready = false;
+
+			if (BMP390_ReadData(&bmp_sensor))
+			{
+				char uart_buf[64];
+				int len = snprintf(uart_buf, sizeof(uart_buf),
+								   "Press: %.2f Pa | Temp: %.2f C\r\n",
+								   bmp_sensor.pressure,
+								   bmp_sensor.temperature);
+
+				HAL_UART_Transmit(&huart3, (uint8_t*)uart_buf, len, 100);
+			}
+		}
 	}
-	/* USER CODE END 3 */
+  /* USER CODE END 3 */
 }
 
 /**
@@ -329,6 +330,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : BMP390_INT_Pin */
+  GPIO_InitStruct.Pin = BMP390_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BMP390_INT_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -336,12 +343,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(BMP390_INT_EXTI_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(BMP390_INT_EXTI_IRQn);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == BMP390_INT_Pin)
+	{
+		bmp390_data_ready = true;
+	}
+}
 
 /* USER CODE END 4 */
 
