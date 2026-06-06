@@ -11,9 +11,11 @@
 // Register Map
 #define BMP390_REG_CALIB_DATA   0x31
 #define BMP390_REG_CHIP_ID      0x00
+#define BMP390_REG_CONFIG		0x1F
 #define BMP390_REG_DATA_0       0x04
 #define BMP390_REG_INT_CTRL     0x19
 #define BMP390_REG_ODR          0x1D
+#define BMP390_REG_OSR			0x1C
 #define BMP390_REG_PWR_CTRL     0x1B
 
 // Calibration Data Structure
@@ -37,7 +39,6 @@ typedef struct {
     float pressure;    // Final output in Pascals
 } BMP390_t;
 
-// Function Prototypes
 bool BMP390_Init(BMP390_t *sensor, I2C_HandleTypeDef *hi2c);
 bool BMP390_ReadData(BMP390_t *sensor);
 
