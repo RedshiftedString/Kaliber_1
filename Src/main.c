@@ -35,6 +35,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <math.h>
 #include <stdio.h>
 #include "bmp390.h"
 
@@ -42,6 +43,14 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+typedef struct
+{
+	float pressure_pa;
+	float temperature_c;
+	float altitude_m;
+	float ground_pressure_pa;
+} BMP390State_t;
 
 /* USER CODE END PTD */
 
@@ -66,6 +75,8 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 BMP390_t bmp_sensor;
 volatile bool bmp390_data_ready = false;
+
+BMP390State_t bmp390_state = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,9 +126,46 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  bool bmp_ready = false;
+
   if (BMP390_Init(&bmp_sensor, &hi2c1))
   {
-	  HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 Initialised successfully!\r\n", 34, 100);
+	  HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 Initialised successfully! Calibrating altitude...\r\n", 58, 100);
+
+	  float pressure_sum = 0.0f;
+	  int j = 0;
+
+	  for (int i = 0; i < 10; i++)
+	  {
+		  HAL_Delay(25);
+		  if (BMP390_ReadData(&bmp_sensor))
+		  {
+			  pressure_sum += bmp_sensor.pressure;
+		  }
+		  else
+		  {
+			  HAL_UART_Transmit(&huart3, (uint8_t*)"Calibration measurement failed, retrying...\r\n", 45, 100);
+			  i--;
+			  j++;
+
+			  if (j >= 10)
+			  {
+				  HAL_UART_Transmit(&huart3, (uint8_t*)"BMP390 Calibration failed!\r\n", 28, 100);
+				  break;
+			  }
+		  }
+	  }
+	  if (j < 10)
+	  {
+		  bmp390_state.ground_pressure_pa = pressure_sum / 10.0f;
+		  HAL_UART_Transmit(&huart3, (uint8_t*)"Calibration Complete!\r\n", 23, 100);
+	  }
+	  else
+	  {
+		  bmp390_state.ground_pressure_pa = 101325.0f;
+		  HAL_UART_Transmit(&huart3, (uint8_t*)"Using standard pressure fallback!\r\n", 35, 100);
+	  }
+	  bmp_ready = true;
   }
   else
   {
@@ -133,17 +181,22 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		if (bmp390_data_ready)
+		if (bmp_ready && bmp390_data_ready)
 		{
 			bmp390_data_ready = false;
 
 			if (BMP390_ReadData(&bmp_sensor))
 			{
+				bmp390_state.pressure_pa = bmp_sensor.pressure;
+				bmp390_state.temperature_c = bmp_sensor.temperature;
+				bmp390_state.altitude_m = 44330.0f *(1.0f - powf(bmp390_state.pressure_pa / bmp390_state.ground_pressure_pa, 0.1903f));
+
 				char uart_buf[64];
 				int len = snprintf(uart_buf, sizeof(uart_buf),
-								   "Press: %.2f Pa | Temp: %.2f C\r\n",
-								   bmp_sensor.pressure,
-								   bmp_sensor.temperature);
+								   "Alt: %.2f m (%.2f Pa) | Temp: %.2f C\r\n",
+								   bmp390_state.altitude_m,
+								   bmp390_state.pressure_pa,
+								   bmp390_state.temperature_c);
 
 				HAL_UART_Transmit(&huart3, (uint8_t*)uart_buf, len, 100);
 			}

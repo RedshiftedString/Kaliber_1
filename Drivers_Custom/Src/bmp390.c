@@ -106,7 +106,7 @@ bool BMP390_Init(BMP390_t *sensor, I2C_HandleTypeDef *hi2c) {
     // 5. Configure Oversampling: Press x8; Temp x1 (0x1C = 0x03)
     if (!BMP390_WriteReg(sensor, BMP390_REG_OSR, 0x03)) return false;
 
-    // 6. Configure Output Data Rate (0x1D = 0x00..0x11) (ODR = 200 Hz / odr_sel)
+    // 6. Configure Output Data Rate (0x1D = 0x00..0x11) (ODR = 200 Hz / 2 ^ odr_sel)
     if (!BMP390_WriteReg(sensor, BMP390_REG_ODR, 0x02)) return false;
 
     // 7. Configure Power and Mode (0x1B = 0x33)
