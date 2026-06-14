@@ -62,12 +62,17 @@ void Error_Handler(void);
 #define BMP390_INT_Pin GPIO_PIN_1
 #define BMP390_INT_GPIO_Port GPIOB
 #define BMP390_INT_EXTI_IRQn EXTI1_IRQn
+#define IMU_INT1_Pin GPIO_PIN_11
+#define IMU_INT1_GPIO_Port GPIOE
+#define IMU_INT1_EXTI_IRQn EXTI15_10_IRQn
 #define LD3_Pin GPIO_PIN_14
 #define LD3_GPIO_Port GPIOB
 #define STLINK_RX_Pin GPIO_PIN_8
 #define STLINK_RX_GPIO_Port GPIOD
 #define STLINK_TX_Pin GPIO_PIN_9
 #define STLINK_TX_GPIO_Port GPIOD
+#define IMU_CS_Pin GPIO_PIN_14
+#define IMU_CS_GPIO_Port GPIOD
 #define LD2_Pin GPIO_PIN_1
 #define LD2_GPIO_Port GPIOE
 
